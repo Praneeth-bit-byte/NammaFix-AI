@@ -1,0 +1,1568 @@
+# NAMMAFIX-AI
+## Phase 2 — Complete Implementation Master Specification
+
+**Document type:** Technical Architecture and Implementation Blueprint  
+**Role:** Principal Software Architect, Security Architect and QA Engineer  
+**Project:** NammaFix-AI — Intelligent Civic Issue Reporting and Resolution Platform  
+**Target geography:** Seven Bengaluru pilot wards  
+**Current phase:** Planning and technical preparation  
+**Implementation status:** Not started  
+**Approval status:** Awaiting explicit user authorization
+
+---
+
+# 1. PROJECT OVERVIEW
+
+## 1.1 Project objective
+
+NammaFix-AI is an intelligent civic issue reporting and resolution platform designed to help citizens report infrastructure and public-service problems and help authorized officials manage their resolution.
+
+The platform will support complaints involving:
+
+- Potholes and damaged roads.
+- Garbage accumulation.
+- Broken streetlights.
+- Water leakage.
+- Open drains.
+- Damaged footpaths.
+- Other supported civic infrastructure problems.
+
+The system will use AI to analyze reports, identify potential duplicate complaints, assess urgency, recommend responsible departments and evaluate resolution evidence.
+
+AI recommendations must not independently authorize official work orders or declare public issues resolved.
+
+## 1.2 Pilot geography
+
+The initial deployment will cover seven pilot areas:
+
+1. Koramangala.
+2. Indiranagar.
+3. Whitefield.
+4. Jayanagar.
+5. MG Road / CBD.
+6. Hebbal.
+7. Malleshwaram.
+
+The application must not claim citywide coverage of all Bengaluru wards.
+
+GPS validation must use verified geographic boundaries for the pilot areas rather than relying exclusively on broad latitude and longitude ranges.
+
+## 1.3 Primary user groups
+
+**Citizen**
+- Register and authenticate.
+- Submit complaints.
+- Upload photographs.
+- Track complaint reference numbers.
+- View progress.
+- Upvote and comment.
+- Receive notifications.
+- Earn civic participation points.
+
+**Official**
+- View assigned complaints.
+- Review AI recommendations.
+- Approve or reject department routing.
+- Update work order progress.
+- Upload resolution evidence.
+
+**Auditor**
+- Review AI execution records.
+- Examine resolution evidence.
+- Verify audit history.
+- Flag suspicious closures.
+
+**Administrator**
+- Manage users and roles.
+- Provision trusted official accounts.
+- Manage pilot wards and department mappings.
+- Monitor jobs, SLAs and notifications.
+- Access audit and operational dashboards.
+
+---
+
+# 2. FINAL SYSTEM ARCHITECTURE
+
+## 2.1 Technology stack
+
+| Layer | Selected technology |
+|---|---|
+| Frontend | Existing React + TypeScript + Vite |
+| Styling | Existing Tailwind CSS v4 |
+| Backend | Node.js + Express + TypeScript |
+| Runtime | tsx during development |
+| Database | Cloud PostgreSQL |
+| ORM | Drizzle ORM |
+| Authentication | Firebase Authentication |
+| Server authentication | Firebase Admin SDK |
+| Image storage | Private object storage |
+| Image access | Time-limited signed URLs |
+| Maps | Leaflet + OpenStreetMap |
+| Vision AI | Google Gemini API |
+| Reasoning AI | IBM Granite through watsonx.ai |
+| AI workflow | IBM watsonx Orchestrate |
+| Background processing | PostgreSQL-backed queue |
+| Notifications | Database inbox and configurable delivery adapters |
+| Audit security | Append-only database permissions + SHA-256 hash chaining |
+| Deployment | Separate development, staging and production environments |
+
+Infrastructure providers must be selected after evaluating free-tier eligibility, geographic availability, PostGIS support, storage limits, backup policies and costs.
+
+No paid provider should be provisioned without approval.
+
+## 2.2 Architecture diagram
+
+```text
+                    CITIZEN / OFFICIAL / ADMIN
+                               |
+                               |
+                       React Web Application
+                               |
+                    Firebase Authentication
+                               |
+                         HTTPS + JWT
+                               |
+                               v
+                    EXPRESS API SERVER
+                               |
+          +--------------------+-------------------+
+          |                    |                   |
+          v                    v                   v
+    PostgreSQL DB       Private Object       Authentication
+    + PostGIS           Storage              + RBAC
+          |
+          |
+     PostgreSQL Job Queue
+          |
+          v
+     Background Worker
+          |
+          v
+     AI ORCHESTRATION LAYER
+          |
+     IBM watsonx Orchestrate
+          |
+      +---+-----------------------+
+      |             |             |
+      v             v             v
+    Gemini       IBM Granite    Backend Tools
+    Vision       Reasoning      and Validation
+      |
+      v
+    AI Results
+      |
+      v
+    Human Approval Gate
+      |
+      v
+    Authorized Official
+      |
+      v
+    Work Order / Resolution
+      |
+      v
+    Resolution Evidence
+      |
+      v
+    AI Follow-up Review
+      |
+      v
+    Human Verification
+      |
+      v
+    Closed & Verified
+```
+
+## 2.3 Architectural rules
+
+1. The backend owns all business rules.
+2. The frontend must never be trusted to authorize privileged actions.
+3. All AI processing must happen server-side.
+4. External AI calls must not occur inside open database transactions.
+5. AI execution must be asynchronous.
+6. Complaint photographs must remain private.
+7. AI recommendations must pass a human approval gate before official dispatch.
+8. Every important state change must create an audit record.
+9. The application must continue operating safely when an external AI provider is unavailable.
+10. All external service credentials must remain server-side.
+
+---
+
+# 3. HYBRID AI ARCHITECTURE
+
+## 3.1 AI system design
+
+The chosen architecture is:
+
+**Gemini + IBM Granite + IBM watsonx Orchestrate.**
+
+These services have different responsibilities.
+
+### Gemini — Visual intelligence
+
+Responsibilities:
+
+- Analyze complaint photographs.
+- Identify visible civic infrastructure problems.
+- Classify visible damage.
+- Extract structured visual observations.
+- Compare before-and-after photographs.
+- Identify obvious inconsistencies in resolution evidence.
+
+The actual Gemini model identifier must be retrieved and verified against current API availability before implementation.
+
+Do not assume that a proposed identifier such as `gemini-3.8-flash` is valid.
+
+### IBM Granite — Text reasoning
+
+Responsibilities:
+
+- Analyze complaint descriptions.
+- Classify complaint categories.
+- Summarize complaint information.
+- Explain priority recommendations.
+- Recommend a department from an approved department directory.
+- Support duplicate-report reasoning.
+- Summarize resolution and SLA information.
+
+The exact Granite model must be selected after checking current watsonx.ai model availability, region, access and pricing.
+
+### IBM watsonx Orchestrate — Workflow coordination
+
+Responsibilities:
+
+- Coordinate AI capabilities.
+- Invoke registered skills.
+- Pass structured inputs and outputs.
+- Maintain workflow execution context.
+- Handle agent handoffs.
+- Return execution results.
+- Support failure recovery.
+- Provide traceable execution identifiers.
+
+watsonx Orchestrate is the workflow coordinator, not a replacement for the Gemini or Granite models.
+
+Its real deployment URL, authentication method, skill registration process and invocation contract must be taken from the actual provisioned IBM instance documentation.
+
+No invented universal API endpoint is permitted.
+
+## 3.2 Five specialist AI capabilities
+
+### Agent 1 — Vision Analysis Agent
+
+Input:
+- Complaint image.
+- Complaint description.
+- GPS coordinates.
+- User-selected category.
+
+Tasks:
+- Detect the visible problem.
+- Identify the likely category.
+- Extract visible severity indicators.
+- Produce structured observations.
+- Flag uncertain or unsuitable images.
+
+Output:
+- Detected category.
+- Visual observations.
+- Suggested severity.
+- Evidence limitations.
+- Review recommendation.
+
+### Agent 2 — Duplicate Detection Agent
+
+Input:
+- New complaint.
+- Nearby existing complaints.
+- Complaint descriptions.
+- Image comparison results, where available.
+
+Tasks:
+- Search geographically nearby reports.
+- Compare issue categories.
+- Compare descriptions.
+- Identify likely duplicate reports.
+- Link complaints where appropriate.
+
+Duplicate detection must use multiple signals:
+
+1. Geographic proximity.
+2. Category similarity.
+3. Text similarity.
+4. Image similarity, when useful.
+
+A model must never automatically reject a report solely because it resembles another report.
+
+The system should preserve the original complaint and link it to the suspected primary complaint when appropriate.
+
+### Agent 3 — Priority Assessment Agent
+
+Input:
+- Complaint description.
+- Visual observations.
+- Location.
+- Category.
+- Duplicate information.
+- Safety-related indicators.
+
+Tasks:
+- Recommend priority.
+- Explain why it was selected.
+- Identify safety concerns.
+- Recommend escalation when necessary.
+
+Priority levels:
+
+- Low.
+- Medium.
+- High.
+- Emergency.
+
+Deterministic backend rules must override unsafe or invalid model recommendations.
+
+Emergency cases must be escalated to an authorized human reviewer.
+
+### Agent 4 — Department Routing Agent
+
+Input:
+- Complaint category.
+- Location and ward.
+- Approved department directory.
+- Priority recommendation.
+
+Tasks:
+- Recommend a responsible department.
+- Explain the recommendation.
+- Identify missing information.
+- Produce a routing proposal.
+
+The backend validates the recommendation against its approved department directory.
+
+No AI agent can independently dispatch a work order.
+
+### Agent 5 — Follow-up and Anti-Ghost Auditor
+
+Input:
+- Original complaint photograph.
+- Resolution photograph.
+- Complaint history.
+- Work order details.
+- Official-submitted resolution notes.
+
+Tasks:
+- Compare before-and-after evidence.
+- Identify visible differences.
+- Detect obvious inconsistencies.
+- Summarize whether the submitted evidence supports the claimed work.
+- Recommend acceptance or further review.
+
+A photograph cannot establish that repairs are durable or that a site is completely safe.
+
+Final closure requires authorized human verification.
+
+## 3.3 AI output contract
+
+All agents must return validated structured JSON.
+
+Each execution must record:
+
+- Agent name.
+- Provider.
+- Actual model identifier.
+- Execution ID.
+- Input summary.
+- Output summary.
+- Start and completion times.
+- Execution status.
+- Retry count.
+- Error details.
+- Confidence only when meaningfully supplied and calibrated.
+
+No fabricated confidence scores or performance claims.
+
+## 3.4 AI fallback strategy
+
+| Situation | Required behaviour |
+|---|---|
+| Gemini unavailable | Record failure and retry according to policy |
+| Granite unavailable | Mark reasoning task unavailable; retain complaint |
+| Orchestrate unavailable | Use explicitly configured local fallback only if approved |
+| Invalid model output | Reject output and record validation failure |
+| AI timeout | Retry asynchronously |
+| AI permanently fails | Send job to failed state and expose review status |
+| Low-confidence result | Request human review |
+
+Fallback execution must never be presented as a genuine IBM Orchestrate execution.
+
+---
+
+# 4. IBM WATSONX ORCHESTRATE DEPLOYMENT DESIGN
+
+## 4.1 Deployment components
+
+The IBM integration will consist of:
+
+1. A provisioned watsonx Orchestrate environment.
+2. An authenticated integration adapter in the Express backend.
+3. Registered specialist skills or agent capabilities.
+4. Defined input and output schemas.
+5. An execution-tracking mechanism.
+6. Timeout and retry policies.
+7. A fallback strategy.
+8. A human approval boundary.
+
+The backend, not the browser, will communicate with IBM.
+
+## 4.2 Authentication
+
+The implementation must follow the actual authentication requirements of the selected IBM watsonx Orchestrate offering.
+
+The integration must:
+
+- Store credentials in server-side secrets.
+- Use short-lived access tokens where the IBM service supports them.
+- Refresh or reacquire tokens securely.
+- Never expose IBM credentials to the frontend.
+- Validate service responses.
+- Record execution identifiers.
+- Handle expired credentials and authorization failures.
+
+The exact endpoint, token exchange and request format remain prerequisites until the IBM instance is provisioned and its documentation is inspected.
+
+## 4.3 Skill contracts
+
+The following are proposed logical contracts, not claims that these skills already exist in IBM.
+
+| Skill | Purpose |
+|---|---|
+| `analyze_complaint` | Coordinate complaint vision and classification |
+| `detect_duplicate` | Assess possible duplicate reports |
+| `assess_priority` | Produce priority recommendation |
+| `recommend_department` | Recommend department |
+| `verify_resolution` | Review submitted closure evidence |
+
+Each contract must define:
+
+- Required input fields.
+- Optional input fields.
+- Output schema.
+- Validation rules.
+- Error codes.
+- Timeout.
+- Idempotency key.
+- Execution identifier.
+
+## 4.4 Invocation lifecycle
+
+1. Backend creates a job.
+2. Worker claims the job.
+3. Worker loads the complaint and relevant evidence.
+4. Worker invokes the configured Orchestrate workflow.
+5. Orchestrate executes its registered capabilities.
+6. Backend receives or retrieves execution results using the actual supported IBM mechanism.
+7. Backend validates the response.
+8. Backend persists AI execution history.
+9. Complaint is updated with recommendations.
+10. Complaint enters Pending Human Approval.
+
+If IBM does not support a required callback mechanism in the selected offering, the adapter must use a documented polling or response mechanism instead.
+
+## 4.5 Failure recovery
+
+- Connection timeout: bounded retry.
+- Authentication error: refresh credentials if supported, otherwise fail safely.
+- Invalid response: schema validation failure.
+- Skill unavailable: record integration failure.
+- Workflow failure: preserve execution details.
+- Repeated failure: dead-letter/failed job state.
+- Recovery: authorized operator may request a safe retry.
+
+**Integration verification requirement:** The project can only claim genuine watsonx Orchestrate integration after a real authenticated execution of a deployed skill has been recorded and verified.
+
+---
+
+# 5. BACKEND AND ASYNCHRONOUS JOB ARCHITECTURE
+
+## 5.1 Express backend
+
+The backend will retain the existing Node.js ecosystem.
+
+Responsibilities:
+
+- Authentication.
+- Authorization.
+- API routing.
+- Database operations.
+- File access control.
+- AI orchestration adapter.
+- Job scheduling.
+- Notifications.
+- Audit logging.
+- SLA monitoring.
+
+The existing server.js will be upgraded to a TypeScript server.ts architecture only after compatibility is checked.
+
+The existing frontend must remain intact.
+
+## 5.2 Job queue
+
+Use a PostgreSQL-backed queue. A maintained queue implementation such as pg-boss may be evaluated before final selection.
+
+Do not build a fragile queue using uncoordinated application-level polling.
+
+Job types:
+
+- `PROCESS_COMPLAINT`.
+- `RUN_VISION_ANALYSIS`.
+- `RUN_DUPLICATE_DETECTION`.
+- `RUN_PRIORITY_ASSESSMENT`.
+- `RUN_DEPARTMENT_ROUTING`.
+- `VERIFY_RESOLUTION`.
+- `SEND_NOTIFICATION`.
+- `CHECK_SLA`.
+
+Job lifecycle:
+
+```text
+QUEUED
+  |
+  v
+PROCESSING
+  |
+  +------> COMPLETED
+  |
+  +------> RETRY_WAIT
+  |            |
+  |            v
+  |         QUEUED
+  |
+  +------> FAILED
+```
+
+## 5.3 Retry strategy
+
+- Maximum attempts: configurable, initially three.
+- Exponential backoff.
+- Randomized retry delay to avoid synchronized retries.
+- Configurable job timeout.
+- Persisted last error.
+- Dead-letter or failed-job state.
+- Administrative retry capability.
+
+## 5.4 Idempotency
+
+Each submitted complaint and external AI job must have an idempotency key.
+
+Repeated delivery of the same job must not:
+
+- Create duplicate complaints.
+- Award civic points twice.
+- Create duplicate notifications.
+- Generate multiple approval records.
+- Repeat an external operation that cannot safely be repeated.
+
+Database uniqueness constraints must enforce the critical guarantees.
+
+## 5.5 Transaction boundaries
+
+Never hold a PostgreSQL transaction open during a Gemini, Granite or IBM network call.
+
+Correct sequence:
+
+1. Validate request.
+2. Persist complaint and upload metadata in a short transaction.
+3. Insert a queue job in the same transaction.
+4. Commit.
+5. Worker processes the job.
+6. Worker performs external AI calls outside the transaction.
+7. Worker persists validated results in another short transaction.
+
+---
+
+# 6. DATABASE ARCHITECTURE
+
+Use PostgreSQL with Drizzle ORM.
+
+PostGIS is preferred for accurate geospatial operations, subject to provider support.
+
+## 6.1 Proposed tables
+
+### users
+
+- id
+- firebase_uid
+- email
+- display_name
+- role
+- account_status
+- ward_id
+- civic_points
+- badge
+- created_at
+- updated_at
+
+Roles:
+- citizen
+- official
+- auditor
+- admin
+
+Roles are server-managed.
+
+### wards
+
+- id
+- name
+- zone
+- boundary_geometry
+- official_in_charge
+- sla_target_days
+- active
+
+### departments
+
+- id
+- department_name
+- supported_categories
+- active
+
+### issues
+
+- id
+- issue_code
+- title
+- description
+- category
+- ward_id
+- location_address
+- latitude
+- longitude
+- reported_by_uid
+- storage_object_key
+- status
+- priority
+- ai_summary
+- recommended_department_id
+- routing_approval_status
+- approved_by_uid
+- approved_at
+- duplicate_of_issue_id
+- is_sample_data
+- created_at
+- updated_at
+
+### issue_evidence
+
+- id
+- issue_id
+- storage_object_key
+- evidence_type
+- uploaded_by_uid
+- uploaded_at
+- metadata_json
+
+Evidence types:
+- initial_report
+- work_progress
+- resolution
+- audit_review
+
+### issue_upvotes
+
+- id
+- issue_id
+- user_uid
+- created_at
+
+Unique constraint:
+`(issue_id, user_uid)`
+
+### comments
+
+- id
+- issue_id
+- author_uid
+- message
+- created_at
+
+### issue_status_history
+
+- id
+- issue_id
+- previous_status
+- new_status
+- changed_by_uid
+- reason
+- created_at
+
+### ai_agent_runs
+
+- id
+- issue_id
+- agent_name
+- provider
+- model_identifier
+- orchestrator_execution_id
+- execution_status
+- input_summary
+- output_json
+- confidence
+- started_at
+- completed_at
+- error_details
+
+### async_jobs
+
+- id
+- job_type
+- payload_json
+- idempotency_key
+- status
+- attempts
+- max_attempts
+- run_at
+- locked_at
+- last_error
+- created_at
+- completed_at
+
+### notifications
+
+- id
+- user_uid
+- issue_id
+- notification_type
+- title
+- message
+- delivery_status
+- read_at
+- created_at
+
+### audit_logs
+
+- id
+- sequence_number
+- actor_uid
+- actor_role
+- action
+- target_type
+- target_id
+- details_json
+- previous_hash
+- row_hash
+- created_at
+
+### official_provisioning
+
+- id
+- firebase_uid
+- assigned_role
+- assigned_ward_id
+- approved_by_uid
+- approved_at
+- status
+
+### sla_records
+
+- id
+- issue_id
+- target_resolution_at
+- actual_resolution_at
+- sla_status
+- last_evaluated_at
+
+## 6.2 Database constraints
+
+Required:
+
+- Primary keys.
+- Foreign keys.
+- Unique Firebase UID.
+- Unique complaint reference.
+- Unique user/complaint upvote.
+- Valid role check constraints.
+- Valid status check constraints.
+- Valid priority check constraints.
+- Valid routing approval states.
+- Non-negative civic points.
+- Valid geographic coordinate ranges.
+- Unique job idempotency keys.
+- Appropriate NOT NULL constraints.
+
+Indexes:
+
+- Issue reference.
+- Ward and status.
+- Category and priority.
+- Creation timestamp.
+- Reporter UID.
+- Duplicate relationship.
+- Spatial location.
+- Queue status and scheduled time.
+- Notification recipient and read state.
+- Audit sequence number.
+
+Use database transactions for logically related writes.
+
+## 6.3 Complaint reference generation
+
+Every accepted complaint must receive a unique human-readable reference such as:
+
+`NF-2026-000001`
+
+The reference must be generated safely under concurrent submissions.
+
+Citizens can use the reference to track their complaint.
+
+---
+
+# 7. SECURE IMAGE STORAGE
+
+Complaint images must never be served from a public static directory.
+
+## 7.1 Storage design
+
+- Private object storage bucket.
+- Public access disabled.
+- Randomized object keys.
+- Encryption at rest where supported.
+- HTTPS for transfer.
+- Short-lived signed download URLs.
+- Server-controlled access checks.
+- File size limits.
+- MIME-type validation.
+- Magic-byte verification.
+- Image decoding and re-encoding where appropriate.
+- Metadata and location privacy review.
+
+Initial proposed upload limit: 5 MB per image, configurable.
+
+Allowed formats:
+- JPEG.
+- PNG.
+- WebP.
+
+Do not trust a filename or browser-provided MIME type.
+
+## 7.2 Signed URL lifecycle
+
+1. User uploads through an authenticated endpoint.
+2. Backend validates the file.
+3. Backend stores it in private object storage.
+4. Database stores only the object key and metadata.
+5. Authorized viewer requests access.
+6. Backend checks ownership or role permissions.
+7. Backend issues a short-lived signed URL.
+
+Initial proposed signed URL lifetime: 15 minutes.
+
+Signed URLs must not be stored permanently in database records or included in unrestricted public feeds.
+
+---
+
+# 8. AUTHENTICATION AND AUTHORIZATION
+
+## 8.1 Firebase Authentication
+
+The frontend uses Firebase Authentication.
+
+The backend verifies ID tokens through Firebase Admin SDK.
+
+Protected API calls use:
+
+`Authorization: Bearer <Firebase ID Token>`
+
+The backend must verify:
+
+- Token signature.
+- Expiration.
+- Firebase project audience.
+- Issuer.
+- User identity.
+
+## 8.2 Role resolution
+
+The server looks up the verified Firebase UID in the trusted users table.
+
+Never trust:
+- Frontend role state.
+- User-submitted role fields.
+- URL parameters.
+- Arbitrary request headers.
+
+## 8.3 Official account provisioning
+
+Official accounts must not be created by simply switching a citizen role in the browser.
+
+Provisioning process:
+
+1. Administrator verifies the official's identity through the approved process.
+2. Administrator assigns a trusted Firebase UID.
+3. Role and ward assignment are recorded.
+4. Provisioning approval is audited.
+5. Official signs in.
+6. Backend retrieves authorized role information.
+
+The same principle applies to auditors and administrators.
+
+## 8.4 Evaluator demo environment
+
+The demo environment must be isolated from production.
+
+It may provide controlled demonstration accounts and sample data.
+
+It must not allow a browser role switcher to grant real production privileges.
+
+---
+
+# 9. COMPLAINT WORKFLOW
+
+## 9.1 Citizen submission
+
+1. Citizen signs in.
+2. Selects complaint category.
+3. Enters description.
+4. Captures or selects photograph.
+5. Provides location.
+6. Backend validates the location against pilot ward boundaries.
+7. Image is stored privately.
+8. Complaint is persisted.
+9. Unique reference number is generated.
+10. AI processing job is enqueued.
+11. Citizen receives submission confirmation.
+
+Initial state:
+
+`Reported`
+
+## 9.2 AI processing
+
+The worker coordinates the AI pipeline.
+
+The issue is evaluated for:
+- Visible category.
+- Duplicate candidates.
+- Priority.
+- Department recommendation.
+
+The backend validates all results.
+
+## 9.3 Human approval
+
+Default routing state:
+
+`Pending Human Approval`
+
+An authorized official reviews:
+- Original report.
+- AI observations.
+- Priority.
+- Duplicate candidates.
+- Recommended department.
+
+The official can:
+- Approve.
+- Override.
+- Reject with a reason.
+- Request additional information.
+
+Only a valid approval unlocks dispatch.
+
+A dispatch request without approval must return:
+
+`HTTP 409 Conflict`
+
+## 9.4 Work order progress
+
+Suggested status lifecycle:
+
+```text
+Reported
+   |
+   v
+AI Processing
+   |
+   v
+Pending Human Approval
+   |
+   +----> Rejected
+   |
+   v
+Approved
+   |
+   v
+Dispatched
+   |
+   v
+In Progress
+   |
+   v
+Resolved - Pending Verification
+   |
+   +----> Further Work Required
+   |
+   v
+Closed & Verified
+```
+
+All status transitions must be validated by the backend.
+
+## 9.5 Resolution verification
+
+1. Official uploads resolution evidence.
+2. Backend stores it privately.
+3. Agent 5 analyzes available evidence.
+4. Results are recorded.
+5. Auditor or authorized official reviews the recommendation.
+6. Authorized human approves final closure.
+7. Complaint is marked Closed & Verified.
+8. Citizen receives notification.
+
+---
+
+# 10. GPS VALIDATION AND DUPLICATE LINKING
+
+## 10.1 GPS validation
+
+- Validate numeric coordinates.
+- Reject invalid latitude and longitude.
+- Check whether the point lies within a supported pilot ward polygon.
+- Reject or request correction for unsupported locations.
+- Record source of location data.
+- Avoid exposing precise citizen location unnecessarily.
+
+A broad Bengaluru bounding box is not sufficient for ward-level validation.
+
+## 10.2 Duplicate linking
+
+Potential duplicate reports must retain independent complaint references.
+
+The platform should support:
+
+- Primary complaint.
+- Linked duplicate complaints.
+- Link reason.
+- Similarity evidence.
+- Review status.
+- Human override.
+
+Upvotes and public engagement must not be confused with duplicate report counts.
+
+---
+
+# 11. NOTIFICATIONS AND SLA MONITORING
+
+## 11.1 Notifications
+
+Notification events:
+
+- Complaint submitted.
+- AI analysis completed.
+- More information requested.
+- Department routing approved.
+- Work order dispatched.
+- Work started.
+- Resolution evidence submitted.
+- Resolution verified.
+- Complaint rejected.
+- SLA approaching deadline.
+- SLA breached.
+
+Phase 2 minimum:
+- In-app notification inbox.
+- Read/unread state.
+- Persistent database records.
+
+Email, SMS or push notification delivery may be added after provider selection and budget review.
+
+A failed external notification must not undo a successfully saved complaint.
+
+## 11.2 SLA monitoring
+
+Each ward and complaint category may have configurable SLA targets.
+
+The system must track:
+- Report submission time.
+- Routing approval time.
+- Dispatch time.
+- Work start time.
+- Resolution submission time.
+- Verification time.
+- Target completion time.
+- Actual completion time.
+- SLA breach.
+
+SLA status:
+- On Track.
+- At Risk.
+- Breached.
+- Completed Within SLA.
+- Completed Late.
+
+The system must distinguish business hours from elapsed calendar time if the selected SLA policy requires it.
+
+---
+
+# 12. AUDIT SECURITY
+
+## 12.1 Append-only audit logs
+
+Record:
+- User provisioning.
+- Role changes.
+- Complaint state changes.
+- Routing approval.
+- Routing rejection.
+- Department reassignment.
+- Evidence submission.
+- Resolution verification.
+- Administrative operations.
+
+## 12.2 SHA-256 hash chaining
+
+Each record includes:
+- Sequence number.
+- Previous record hash.
+- Canonicalized record payload.
+- Current row hash.
+- Timestamp.
+
+Conceptually:
+
+`row_hash = SHA256(previous_hash + canonical_payload)`
+
+Canonicalization, timestamp representation and encoding must be deterministic.
+
+## 12.3 Permission enforcement
+
+- Application runtime database user cannot update or delete audit records.
+- Audit writes occur through a restricted database function or dedicated writer.
+- Migration owner is separate from runtime application credentials.
+- Administrative access is restricted.
+- Audit chain verification is available to authorized administrators.
+
+Hash chaining is tamper-evident, not absolute immutability. Privileged database administrators may still be capable of altering the entire chain. Stronger assurance requires independent checkpoints or external retention.
+
+---
+
+# 13. API SPECIFICATIONS
+
+All APIs use JSON except multipart upload endpoints.
+
+Protected routes require verified Firebase authentication.
+
+## 13.1 Public and citizen APIs
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health` | Service health |
+| GET | `/api/issues` | List/filter complaints |
+| POST | `/api/issues` | Submit complaint |
+| GET | `/api/issues/:code` | Retrieve complaint |
+| GET | `/api/issues/:code/history` | Track progress |
+| POST | `/api/issues/:code/upvote` | Upvote complaint |
+| POST | `/api/issues/:code/comments` | Add comment |
+| GET | `/api/issues/:code/comments` | Retrieve comments |
+| GET | `/api/notifications` | Notification inbox |
+| PATCH | `/api/notifications/:id/read` | Mark notification read |
+
+## 13.2 Official and administrator APIs
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/admin/approval-queue` | Pending approvals |
+| POST | `/api/admin/issues/:code/approve-routing` | Approve routing |
+| POST | `/api/admin/issues/:code/reject-routing` | Reject routing |
+| PATCH | `/api/admin/issues/:code/status` | Update work progress |
+| POST | `/api/admin/issues/:code/evidence` | Upload evidence |
+| POST | `/api/admin/issues/:code/verify-resolution` | Request verification |
+| GET | `/api/admin/audit-logs` | View audit records |
+| GET | `/api/admin/audit-logs/verify` | Verify hash chain |
+| POST | `/api/admin/users/provision` | Provision trusted role |
+| PATCH | `/api/admin/users/:uid/role` | Manage trusted role |
+
+## 13.3 Analytics APIs
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/analytics/wards` | Ward metrics |
+| GET | `/api/analytics/leaderboard` | Citizen rankings |
+| GET | `/api/analytics/resolution-slas` | SLA metrics |
+| GET | `/api/analytics/agent-performance` | Agent execution metrics |
+| GET | `/api/analytics/issues` | Issue statistics |
+
+## 13.4 Internal worker APIs
+
+These must never be publicly accessible without service authentication.
+
+- `POST /internal/agents/vision`
+- `POST /internal/agents/duplicate`
+- `POST /internal/agents/priority`
+- `POST /internal/agents/routing`
+- `POST /internal/agents/follow-up`
+
+Internal service endpoints must use restricted service credentials or be implemented as private service functions rather than exposed HTTP routes when possible.
+
+---
+
+# 14. EXACT FILE CREATION AND MODIFICATION PLAN
+
+The following list is proposed and must be reconciled with the actual repository before implementation.
+
+## 14.1 Files to create
+
+| File | Responsibility |
+|---|---|
+| `server.ts` | Full-stack Express server |
+| `.env.example` | Environment variable documentation |
+| `src/db/schema.ts` | Drizzle database schema |
+| `src/db/drizzle.config.ts` | Migration configuration |
+| `src/db/index.ts` | PostgreSQL connection |
+| `src/db/seed.ts` | Pilot ward/sample data seeder |
+| `src/lib/firebase.ts` | Firebase client initialization |
+| `src/lib/firebase-admin.ts` | Firebase server initialization |
+| `src/lib/storage.ts` | Private object storage adapter |
+| `src/middleware/auth.ts` | Authentication and RBAC |
+| `src/middleware/upload.ts` | Secure upload validation |
+| `src/server/services/aiAgents.ts` | AI capability adapters |
+| `src/server/services/watsonxOrchestrate.ts` | IBM integration adapter |
+| `src/server/services/jobQueue.ts` | Job scheduling and worker |
+| `src/server/services/audit.ts` | Hash-chained audit writer |
+| `src/server/services/notifications.ts` | Notification service |
+| `src/server/services/sla.ts` | SLA calculation |
+| `src/server/routes/issues.ts` | Complaint APIs |
+| `src/server/routes/admin.ts` | Administrative APIs |
+| `src/server/routes/analytics.ts` | Analytics APIs |
+| `src/components/BengaluruMap.tsx` | Interactive map |
+| `docs/IBM_BOB_USAGE.md` | Evidence-based IBM Bob development record |
+| `docs/ARCHITECTURE.md` | Final architecture documentation |
+| `docs/API.md` | API documentation |
+| `docs/SECURITY.md` | Security documentation |
+| `docs/DEPLOYMENT.md` | Environment deployment instructions |
+
+Additional files may be required after repository inspection.
+
+## 14.2 Existing files to modify
+
+| File | Planned change |
+|---|---|
+| `package.json` | Add verified dependencies and scripts |
+| `index.html` | Include map styling as required |
+| `src/types.ts` | Extend types for persisted data and workflow states |
+| `src/App.tsx` | Connect application data and authentication |
+| `src/components/Navbar.tsx` | Connect real login and trusted roles |
+| `src/components/Feed.tsx` | Connect persisted complaint feed and map |
+| `src/components/ReportModal.tsx` | Connect complaint submission |
+| `src/components/IssueDetailModal.tsx` | Display history and AI telemetry |
+| `src/components/AdminPortal.tsx` | Implement approval and audit workflows |
+| `src/components/WardAnalytics.tsx` | Connect database analytics |
+| `src/components/Leaderboard.tsx` | Connect persistent rankings |
+
+No UI redesign is authorized by this plan.
+
+---
+
+# 15. SECURITY THREAT MODEL
+
+| Threat | Severity | Required mitigation |
+|---|---|---|
+| Privilege escalation | Critical | Server-side Firebase verification and trusted RBAC |
+| Unauthorized image access | High | Private bucket and signed URLs |
+| Audit manipulation | Critical | Append-only permissions and hash chain |
+| Duplicate submissions | Medium | Idempotency and unique constraints |
+| SQL injection | High | Parameterized ORM queries |
+| Malicious file uploads | High | Magic-byte checks and image decoding |
+| GPS spoofing | Medium | Geographic validation and review |
+| AI prompt injection | High | Treat user content as untrusted input |
+| Invalid AI outputs | High | Schema validation and deterministic rules |
+| Unauthorized dispatch | Critical | Backend human approval hard gate |
+| Queue replay | Medium | Idempotent jobs and attempt tracking |
+| Credential leakage | Critical | Server-side secret management |
+| Notification abuse | Medium | Rate limits and authorization |
+| Denial of service | High | Rate limits, upload caps and timeouts |
+
+Security tests must verify both positive and negative access scenarios.
+
+---
+
+# 16. TESTING AND ACCEPTANCE CRITERIA
+
+## 16.1 Build and code quality
+
+- TypeScript compilation succeeds.
+- Lint succeeds.
+- Production build succeeds.
+- No secrets are included in client bundles.
+- Existing responsive layouts remain functional.
+
+## 16.2 Database
+
+- Migrations apply cleanly.
+- Seeding is idempotent.
+- Foreign keys work.
+- Unique constraints prevent duplicate upvotes.
+- Invalid state values are rejected.
+- Concurrent complaint submissions receive unique references.
+
+## 16.3 Authentication
+
+- Valid Firebase token succeeds.
+- Expired token fails.
+- Invalid token fails.
+- Citizen cannot access admin APIs.
+- User-submitted role changes are ignored.
+- Official provisioning is audited.
+
+## 16.4 Complaint workflow
+
+- Complaint is saved persistently.
+- Reference code is returned.
+- Refreshing the browser preserves complaint data.
+- Uploaded evidence is privately stored.
+- Duplicate complaint candidates are linked safely.
+- GPS outside supported pilot wards is rejected or reviewed.
+
+## 16.5 Human approval gate
+
+Test:
+
+1. Submit a complaint.
+2. Run AI recommendation.
+3. Attempt dispatch without approval.
+4. Verify HTTP 409 Conflict.
+5. Approve using an authorized official.
+6. Dispatch successfully.
+7. Verify audit record creation.
+
+## 16.6 AI and IBM
+
+- Gemini request succeeds using an actually available model.
+- Granite request succeeds using an actually available model.
+- Orchestrate invokes a deployed skill with real authentication.
+- Structured output is validated.
+- Provider failures are recorded.
+- Invalid outputs cannot change official state.
+- Fallback execution is labelled accurately.
+
+## 16.7 Queue recovery
+
+- Worker crash triggers retry.
+- Duplicate job delivery does not duplicate business operations.
+- Exhausted jobs enter failed state.
+- Client complaint submission does not hang while AI runs.
+
+## 16.8 Audit verification
+
+- Every relevant state change produces an audit record.
+- Runtime application credentials cannot update or delete audit entries.
+- Modification of a record breaks verification.
+- Chain sequence and previous hashes are validated.
+
+## 16.9 User experience
+
+Test at:
+- 360px mobile.
+- 390px mobile.
+- Tablet.
+- Laptop.
+- Desktop.
+
+Preserve:
+- Navy/blue design.
+- Existing typography.
+- SafeImage fallbacks.
+- Existing layout and component structure.
+
+---
+
+# 17. DEVELOPMENT ENVIRONMENTS
+
+## 17.1 Local development
+
+Purpose: rapid development and testing.
+
+Components:
+- Local Express application.
+- Local or approved development PostgreSQL.
+- Local private-storage emulator or controlled test adapter.
+- Simulated AI provider adapters where genuine API credentials are unavailable.
+- Test Firebase project.
+
+All simulated services must be visibly identified.
+
+## 17.2 Staging
+
+Purpose: integration testing.
+
+Components:
+- Staging application deployment.
+- Staging PostgreSQL database.
+- Private staging object storage.
+- Staging Firebase project.
+- Gemini and Granite credentials if available.
+- Actual watsonx Orchestrate integration if provisioned.
+- Synthetic complaint data.
+
+No real citizen personal data should be used for routine testing.
+
+## 17.3 Production
+
+Purpose: actual public deployment.
+
+Components:
+- Production application hosting.
+- Managed PostgreSQL.
+- Private object storage.
+- Production Firebase configuration.
+- Server-side AI secrets.
+- Genuine watsonx Orchestrate instance.
+- Monitoring and backup policies.
+- Restricted administrator access.
+
+Development, staging and production secrets and databases must be separate.
+
+---
+
+# 18. INFRASTRUCTURE COST AND PREREQUISITES
+
+No exact total cost can be responsibly promised before providers, regions, usage and current pricing are verified.
+
+| Service | Purpose | Prerequisite |
+|---|---|---|
+| Cloud PostgreSQL | Persistent records and queue | Suitable provider and database credentials |
+| Object storage | Private photographs | Private bucket and signing support |
+| Firebase | Authentication | Firebase project and authorized configuration |
+| Gemini | Vision analysis | API key and model access |
+| IBM watsonx.ai | Granite reasoning | IBM project, region and model entitlement |
+| IBM watsonx Orchestrate | Workflow coordination | Active instance and integration credentials |
+| Application host | API and frontend | Deployment target |
+| Map tiles | Interactive maps | Tile provider usage policy and attribution |
+
+Before selecting services, evaluate:
+
+- Free-tier availability.
+- Student eligibility.
+- Usage quotas.
+- Storage and bandwidth.
+- Database sleeping or scale-to-zero behaviour.
+- PostGIS support.
+- Backups.
+- Data retention.
+- Network egress.
+- Production restrictions.
+- Billing activation requirements.
+
+Do not enter paid usage without explicit user approval.
+
+---
+
+# 19. IBM BOB DEVELOPMENT WORKFLOW
+
+IBM Bob must be used genuinely during development.
+
+The project must not fabricate previous Bob contributions.
+
+Proposed workflow:
+
+### Task 1 — Repository architecture review
+Use Bob to inspect existing architecture and identify integration risks.
+
+### Task 2 — Database and data integrity
+Use Bob to review schema normalization, relationships and constraints.
+
+### Task 3 — Security review
+Use Bob to review authentication, RBAC, file upload and approval controls.
+
+### Task 4 — AI workflow review
+Use Bob to inspect agent contracts, orchestration and error recovery.
+
+### Task 5 — Testing
+Use Bob to assist with state-machine and security test development.
+
+### Task 6 — Final review
+Use Bob to review deployment readiness and documentation.
+
+For every genuine task, preserve:
+- Date.
+- Task description.
+- Prompt or task record.
+- Bob output or relevant evidence.
+- Files actually changed.
+- Human review.
+- Test results.
+
+`docs/IBM_BOB_USAGE.md` must be written from actual evidence, not planned or invented contributions.
+
+---
+
+# 20. IMPLEMENTATION MILESTONES
+
+| Milestone | Scope | Completion condition |
+|---|---|---|
+| M0 | Final repository and provider verification | Architecture and prerequisites confirmed |
+| M1 | PostgreSQL schema and migrations | Database tests pass |
+| M2 | Private storage | Secure upload and signed access work |
+| M3 | Firebase and RBAC | Authorization tests pass |
+| M4 | Complaint APIs and tracking | Citizen workflow persists |
+| M5 | Job queue and notifications | Retry and recovery tests pass |
+| M6 | Gemini and Granite agents | Genuine model calls verified |
+| M7 | watsonx Orchestrate | Real skill execution verified |
+| M8 | Human approval and audit | Governance tests pass |
+| M9 | Maps, analytics and frontend integration | Existing UI connected and responsive |
+| M10 | Staging and evaluator demo | End-to-end acceptance tests pass |
+| M11 | Production readiness | Deployment and security review approved |
+
+Each milestone requires:
+- Scope confirmation.
+- Implementation.
+- Tests.
+- Review.
+- Git commit.
+- Updated documentation.
+- User approval before any consequential paid provisioning or deployment.
+
+---
+
+# 21. FINAL DEFINITION OF DONE
+
+NammaFix-AI Phase 2 is complete only when:
+
+1. Citizens can submit and track persistent complaints.
+2. Complaint images are securely stored.
+3. Firebase authentication and backend RBAC work.
+4. Official accounts are securely provisioned.
+5. AI capabilities execute using verified providers and model IDs.
+6. IBM watsonx Orchestrate performs a real verified workflow execution.
+7. Duplicate complaints are safely linked.
+8. Human approval controls department dispatch.
+9. Resolution evidence is reviewed and human-verified.
+10. Notifications are persistent.
+11. SLA metrics are calculated from real records.
+12. Audit history is append-only for application roles and cryptographically verifiable.
+13. Queue retries and recovery work.
+14. Existing frontend design remains stable.
+15. Staging and evaluator demo environments work.
+16. Security, integration and end-to-end tests pass.
+17. IBM Bob contributions are documented with genuine evidence.
+18. No simulated integration is presented as production functionality.
+
+---
+
+# 22. CURRENT APPROVAL AND EXECUTION BOUNDARY
+
+This document is a planning specification only.
+
+**Not authorized or performed:**
+- No source code changes.
+- No package installations.
+- No database migrations.
+- No API key creation.
+- No cloud provisioning.
+- No account configuration.
+- No deployment.
+- No paid service activation.
+
+The next action is to review the specification, verify the remaining provider and model decisions, and approve implementation milestone by milestone.
+
+**NammaFix-AI Phase 2: Architecture defined. Implementation awaiting explicit approval.**

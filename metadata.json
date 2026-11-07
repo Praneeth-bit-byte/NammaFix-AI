@@ -1,0 +1,9 @@
+{
+  "name": "NammaFix-AI - Bengaluru Civic Infrastructure Platform",
+  "description": "AI-powered civic infrastructure reporting, geospatial ward routing, and verified resolution platform for Bengaluru",
+  "request": "Build NammaFix-AI civic infrastructure reporting and action platform for Bengaluru with AI verification against ghost resolutions, ward dashboards, and reporting tools.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "permissions": []
+}
